@@ -1,6 +1,21 @@
 package hk.unspike;
 
+import org.geotools.data.DataStore;
+import org.geotools.data.DataStoreFinder;
+import org.geotools.data.FeatureSource;
+import org.geotools.data.simple.SimpleFeatureSource;
+import org.geotools.data.simple.SimpleFeatureCollection;
+import org.geotools.data.simple.SimpleFeatureIterator;
+import org.geotools.feature.DefaultFeatureCollection;
+import org.opengis.feature.simple.SimpleFeature;
+import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.geometry.BoundingBox;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Polygon;
+
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Unspike {
 
@@ -10,7 +25,6 @@ public class Unspike {
     private static boolean verbose;
 
     public Unspike() {
-
     }
 
     public static void main(String[] args) {
@@ -70,5 +84,39 @@ public class Unspike {
         if (outputFile == null) {
             outputFile = new File(inputFile.getName().replace(".gpkg", "_unspiked.gpkg"));
         }
+
+        try {
+            interrogateVertices();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void interrogateVertices() throws Exception {
+        Map<String, Object> map = new HashMap<>();
+        map.put("dbtype", "geopkg");
+        map.put("database", inputFile.getAbsolutePath());
+
+        DataStore dataStore = DataStoreFinder.getDataStore(map);
+        String typeName = dataStore.getTypeNames()[0];
+        SimpleFeatureSource featureSource = dataStore.getFeatureSource(typeName);
+        SimpleFeatureCollection collection = featureSource.getFeatures();
+
+        try (SimpleFeatureIterator iterator = collection.features()) {
+            while (iterator.hasNext()) {
+                SimpleFeature feature = iterator.next();
+                Geometry geometry = (Geometry) feature.getDefaultGeometry();
+
+                if (geometry instanceof Polygon) {
+                    Polygon polygon = (Polygon) geometry;
+                    System.out.println("Vertices of Polygon:");
+                    for (int i = 0; i < polygon.getCoordinates().length; i++) {
+                        System.out.println(polygon.getCoordinates()[i]);
+                    }
+                }
+            }
+        }
+
+        dataStore.dispose();
     }
 }
