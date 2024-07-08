@@ -1,4 +1,4 @@
-# Unspike Java
+# Unspike gpkg (Java stand-alone version)
 
 Unspike Java is a command-line tool designed to process GeoPackage files by identifying and removing vertices that form sharp angles in polygon geometries. This tool helps in cleaning up geometries by eliminating "spikes" based on a user-defined minimum angle.
 
