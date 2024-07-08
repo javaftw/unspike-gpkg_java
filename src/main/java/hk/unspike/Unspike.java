@@ -8,6 +8,7 @@ import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.referencing.CRS;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Polygon;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
@@ -16,9 +17,9 @@ import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureIterator;
 
 import java.io.File;
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import org.geotools.geopkg.FeatureEntry;
@@ -89,6 +90,10 @@ public class Unspike {
             }
         }
 
+        if (minAngle == 0) {
+            throw new IllegalArgumentException("The minimum angle is invalid or missing.");
+        }
+
         if (inputFile == null) {
             throw new IllegalArgumentException("Input file is required.");
         }
@@ -103,11 +108,11 @@ public class Unspike {
             e.printStackTrace();
         }
     }
-    
-    private static double calculateAngle(double[] p0, double[] p1, double[] p2) {
+
+    private static double calculateAngle(Coordinate p0, Coordinate p1, Coordinate p2) {
         // Calculate vectors from p1 to p0 and p1 to p2
-        double[] v1 = new double[]{p0[0] - p1[0], p0[1] - p1[1]};
-        double[] v2 = new double[]{p2[0] - p1[0], p2[1] - p1[1]};
+        double[] v1 = new double[]{p0.x - p1.x, p0.y - p1.y};
+        double[] v2 = new double[]{p2.x - p1.x, p2.y - p1.y};
 
         // Calculate dot product and norms
         double dotProduct = v1[0] * v2[0] + v1[1] * v2[1];
@@ -123,16 +128,16 @@ public class Unspike {
         double cosineAngle = Math.max(-1.0, Math.min(1.0, dotProduct / (normV1 * normV2)));
         return Math.toDegrees(Math.acos(cosineAngle));
     }
-    
+
     private static File generateUniqueOutputFilename(File inputFile) {
         String inputName = inputFile.getName();
         String baseName = inputName.substring(0, inputName.lastIndexOf('.'));
         String extension = inputName.substring(inputName.lastIndexOf('.'));
-        
+
         LocalDateTime now = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH-mm_dd-MM-yyyy");
         String timestamp = now.format(formatter);
-        
+
         return new File(inputFile.getParent(), baseName + "_unspiked_" + timestamp + extension);
     }
 
@@ -162,17 +167,23 @@ public class Unspike {
                 }
             }
         }
-        
+
         if (verbose) {
+            System.out.println("Original Vertices:");
             listVertices(collection);
         }
 
-        writeGeoPackage(collection, typeName, dataStore.getSchema(typeName));
+        writeGeoPackage(newCollection, typeName, dataStore.getSchema(typeName));
+
+        if (verbose) {
+            System.out.println("Modified Vertices:");
+            listVertices(newCollection);
+        }
+
         dataStore.dispose();
     }
-    
+
     private static void listVertices(SimpleFeatureCollection collection) {
-        System.out.println("Listing vertices of input geometries:");
         try (SimpleFeatureIterator iterator = collection.features()) {
             int featureCount = 0;
             while (iterator.hasNext()) {
@@ -188,9 +199,40 @@ public class Unspike {
     }
 
     private static Polygon removeSpikes(Polygon polygon) {
-        // Implement spike removal logic based on minAngle
-        // For simplicity, we'll just return the original polygon for now
-        return polygon;
+        Coordinate[] coordinates = polygon.getCoordinates();
+        ArrayList<Coordinate> newCoordinates = new ArrayList<>();
+        boolean spikeRemoved = false;
+
+        for (int i = 0; i < coordinates.length - 2; i++) {
+            Coordinate p0 = coordinates[i];
+            Coordinate p1 = coordinates[(i + 1) % coordinates.length];
+            Coordinate p2 = coordinates[(i + 2) % coordinates.length];
+
+            double angle = calculateAngle(p0, p1, p2);
+            if (!Double.isNaN(angle) && angle >= minAngle) {
+                newCoordinates.add(p1);
+            } else {
+                spikeRemoved = true;
+                if (verbose) {
+                    System.out.printf("Removed spike at: (%.6f, %.6f) with angle: %.2f%n", p1.x, p1.y, angle);
+                }
+            }
+        }
+
+        // Ensure the polygon is closed by adding the first point to the end if not already present
+        if (!newCoordinates.isEmpty() && !newCoordinates.get(0).equals(newCoordinates.get(newCoordinates.size() - 1))) {
+            newCoordinates.add(newCoordinates.get(0));
+        }
+
+        if (newCoordinates.isEmpty() || !spikeRemoved) {
+            if (verbose) {
+                System.out.println("No spikes removed.");
+            }
+            return polygon; // Return the original polygon if no coordinates are left or no spikes were removed
+        }
+
+        GeometryFactory geometryFactory = new GeometryFactory();
+        return geometryFactory.createPolygon(newCoordinates.toArray(new Coordinate[0]));
     }
 
     private static void writeGeoPackage(SimpleFeatureCollection collection, String typeName, SimpleFeatureType schema) throws Exception {
