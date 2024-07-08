@@ -1,4 +1,5 @@
 /target/
 /nb-configuration.xml
-/spiky-polygons.gpkg
 /dependency-reduced-pom.xml
+/*.gpkg
+*.gpkg
