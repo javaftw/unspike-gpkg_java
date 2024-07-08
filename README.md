@@ -53,3 +53,26 @@ The project uses the following dependencies (managed with Maven):
 - org.geotools:gt-referencing
 - org.geotools:gt-epsg-hsql
 - org.geotools:gt-epsg-extension
+
+## Flow Diagram
+
+```mermaid
+graph TD
+    A[Start] --> B[Parse Command-Line Arguments]
+    B --> C{Are Arguments Valid?}
+    C -- No --> D[Show Error Message]
+    C -- Yes --> E[Initialize CRS System]
+    E --> F[Open GeoPackage File]
+    F --> G[Read Features]
+    G --> H[Initialize New Feature Collection]
+    H --> I[Iterate Over Features]
+    I --> J{Is Geometry a Polygon?}
+    J -- No --> K[Skip Feature]
+    J -- Yes --> L[Remove Spikes from Polygon]
+    L --> M[Create New Feature with Modified Polygon]
+    M --> N[Add New Feature to Collection]
+    N --> O{Are More Features?}
+    O -- Yes --> I
+    O -- No --> P[Write Modified Features to GeoPackage]
+    P --> Q[Close GeoPackage File]
+    Q --> R[End]
