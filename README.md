@@ -37,7 +37,7 @@ java -jar target/unspike_java-0.1-alpha-shaded.jar -i example.gpkg -a 1.5 -v
 
 Run the shaded JAR file from the command line with the appropriate options.
 
-** Command-Line Options **
+**Command-Line Options**
 - `-i <input_file>`: Specifies the input GeoPackage file (required).
 - `-o <output_file>`: Specifies the output GeoPackage file (optional, a unique filename will be generated if not provided).
 - `-a <min_angle>`: Specifies the minimum angle in degrees for spike removal (required).
